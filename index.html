@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glass iPhone 8-Ball Pool (2 Player)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a, #1e1b4b, #311042);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            overflow-x: hidden;
+            padding: 10px;
+        }
+
+        /* iPhone Glass Container */
+        .glass-container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 32px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 960px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Scoreboard Glass Cards */
+        .scoreboard {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 15px;
+            gap: 15px;
+        }
+
+        .player-card {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .player-card.active {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.5);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .player-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
+
+        .player-type {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 10px 20px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            text-align: center;
+            width: 100%;
+            color: #e2e8f0;
+        }
+
+        /* Canvas Wrapper */
+        .canvas-wrapper {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(0,0,0,0.8);
+            border: 4px solid #291811;
+            background: #064e3b;
+        }
+
+        canvas {
+            display: block;
+            background: #065f46;
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        /* Controls / Reset */
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        @media (max-width: 850px) {
+            .glass-container {
+                padding: 10px;
+                border-radius: 20px;
+            }
+            canvas {
+                width: 100% !important;
+                height: auto !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="glass-container">
+        <header>
+            <h1>8-Ball Pool • iPhone Glass Edition</h1>
+        </header>
+
+        <div class="scoreboard">
+            <div id="player1Card" class="player-card active">
+                <div class="player-name">Player 1</div>
+                <div id="p1Type" class="player-type">Unassigned</div>
+            </div>
+            <div id="player2Card" class="player-card">
+                <div class="player-name">Player 2</div>
+                <div id="p2Type" class="player-type">Unassigned</div>
+            </div>
+        </div>
+
+        <div id="statusBar" class="status-bar">Player 1's Turn: Drag to Aim & Shoot</div>
+
+        <div class="canvas-wrapper">
+            <canvas id="poolCanvas" width="840" height="420"></canvas>
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="resetGame()">Restart Game</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('poolCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Table Dimensions
+        const table = {
+            x: 40,
+            y: 40,
+            width: 760,
+            height: 340,
+            cushion: 16
+        };
+
+        // Pockets
+        const pockets = [
+            { x: table.x, y: table.y, radius: 22 },
+            { x: table.x + table.width / 2, y: table.y - 4, radius: 20 },
+            { x: table.x + table.width, y: table.y, radius: 22 },
+            { x: table.x, y: table.y + table.height, radius: 22 },
+            { x: table.x + table.width / 2, y: table.y + table.height + 4, radius: 20 },
+            { x: table.x + table.width, y: table.y + table.height, radius: 22 }
+        ];
+
+        let balls = [];
+        let cueBall = null;
+        let turn = 1; // 1 or 2
+        let p1Type = null; // 'solid', 'stripe', or null
+        let p2Type = null;
+        let ballInHand = false;
+        let gameOver = false;
+        let message = "Player 1's Turn";
+        let shotTaken = false;
+        let shotPottedBalls = [];
+
+        // Aiming state
+        let isAiming = false;
+        let aimStart = { x: 0, y: 0 };
+        let aimCurrent = { x: 0, y: 0 };
+
+        class Ball {
+            constructor(x, y, radius, color, number, isStripe = false) {
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = radius;
+                this.color = color;
+                this.number = number;
+                this.isStripe = isStripe;
+                this.pocketed = false;
+            }
+
+            draw() {
+                if (this.pocketed) return;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+               
+                // Ball 3D Lighting Effect
+                const gradient = ctx.createRadialGradient(
+                    this.x - 3, this.y - 3, 2,
+                    this.x, this.y, this.radius
+                );
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+                gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                if (this.isStripe && this.number !== 8) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * 0.65, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                }
+
+                if (this.number !== 0) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * 0.45, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                    ctx.fillStyle = '#000000';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(this.number, this.x, this.y);
+                }
+                ctx.restore();
+            }
+
+            update() {
+                if (this.pocketed) return;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Friction
+                this.vx *= 0.985;
+                this.vy *= 0.985;
+
+                if (Math.abs(this.vx) < 0.05) this.vx = 0;
+                if (Math.abs(this.vy) < 0.05) this.vy = 0;
+
+                // Cushion Collisions
+                const minX = table.x + table.cushion + this.radius;
+                const maxX = table.x + table.width - table.cushion - this.radius;
+                const minY = table.y + table.cushion + this.radius;
+                const maxY = table.y + table.height - table.cushion - this.radius;
+
+                if (this.x < minX) { this.x = minX; this.vx *= -0.8; }
+                if (this.x > maxX) { this.x = maxX; this.vx *= -0.8; }
+                if (this.y < minY) { this.y = minY; this.vy *= -0.8; }
+                if (this.y > maxY) { this.y = maxY; this.vy *= -0.8; }
+            }
+        }
+
+        function initRack() {
+            balls = [];
+            cueBall = new Ball(table.x + 180, table.y + table.height / 2, 11, '#f8fafc', 0, false);
+            balls.push(cueBall);
+
+            const startX = table.x + table.width - 220;
+            const startY = table.y + table.height / 2;
+            const r = 11;
+            const dist = r * 2.05;
+
+            const colors = [
+                '#eab308', '#2563eb', '#dc2626', '#9333ea',
+                '#ea580c', '#16a34a', '#b91c1c', '#0f172a',
+                '#eab308', '#2563eb', '#dc2626', '#9333ea',
+                '#ea580c', '#16a34a', '#b91c1c'
+            ];
+
+            const rackOrder = [1, 2, 8, 3, 9, 10, 4, 11, 5, 12, 6, 13, 7, 14, 15];
+            let count = 0;
+
+            for (let col = 0; col < 5; col++) {
+                for (let row = 0; row <= col; row++) {
+                    const x = startX + col * dist * 0.866;
+                    const y = startY + (row - col / 2) * dist;
+                    const num = rackOrder[count];
+                    const isStripe = num > 8;
+                    balls.push(new Ball(x, y, r, colors[num - 1], num, isStripe));
+                    count++;
+                }
+            }
+           
+            p1Type = null;
+            p2Type = null;
+            turn = 1;
+            ballInHand = false;
+            gameOver = false;
+            shotTaken = false;
+            shotPottedBalls = [];
+            message = "Player 1's Turn: Aim and Shoot";
+            updateUI();
+        }
+
+        function checkCollisions() {
+            for (let i = 0; i < balls.length; i++) {
+                for (let j = i + 1; j < balls.length; j++) {
+                    let b1 = balls[i];
+                    let b2 = balls[j];
+                    if (b1.pocketed || b2.pocketed) continue;
+
+                    let dx = b2.x - b1.x;
+                    let dy = b2.y - b1.y;
+                    let dist = Math.hypot(dx, dy);
+                    let minDist = b1.radius + b2.radius;
+
+                    if (dist < minDist) {
+                        let overlap = minDist - dist;
+                        let nx = dx / dist;
+                        let ny = dy / dist;
+
+                        b1.x -= nx * overlap * 0.5;
+                        b1.y -= ny * overlap * 0.5;
+                        b2.x += nx * overlap * 0.5;
+                        b2.y += ny * overlap * 0.5;
+
+                        let kx = b1.vx - b2.vx;
+                        let ky = b1.vy - b2.vy;
+                        let p = 2 * (nx * kx + ny * ky) / 2;
+
+                        b1.vx -= p * nx * 0.95;
+                        b1.vy -= p * ny * 0.95;
+                        b2.vx += p * nx * 0.95;
+                        b2.vy += p * ny * 0.95;
+                    }
+                }
+            }
+        }
+
+        function checkPockets() {
+            balls.forEach(ball => {
+                if (ball.pocketed) return;
+
+                pockets.forEach(pocket => {
+                    let dist = Math.hypot(ball.x - pocket.x, ball.y - pocket.y);
+                    if (dist < pocket.radius) {
+                        ball.pocketed = true;
+                        ball.vx = 0;
+                        ball.vy = 0;
+                        shotPottedBalls.push(ball);
+                    }
+                });
+            });
+        }
+
+        function evaluateShotResults() {
+            let scratch = shotPottedBalls.some(b => b.number === 0);
+            let eightBall = shotPottedBalls.find(b => b.number === 8);
+            let regularBalls = shotPottedBalls.filter(b => b.number !== 0 && b.number !== 8);
+
+            if (scratch) {
+                // Cue ball scratch
+                setTimeout(() => {
+                    cueBall.x = table.x + 180;
+                    cueBall.y = table.y + table.height / 2;
+                    cueBall.pocketed = false;
+                }, 100);
+                ballInHand = true;
+                message = `Foul! Scratch. Player ${3 - turn} gets Ball-in-Hand.`;
+                turn = 3 - turn;
+                updateUI();
+                shotPottedBalls = [];
+                return;
+            }
+
+            if (eightBall) {
+                let currentType = turn === 1 ? p1Type : p2Type;
+                let remaining = balls.filter(b => !b.pocketed && b.number !== 8 && b.number !== 0);
+                let hasAssignedRemaining = remaining.some(b => currentType === 'solid' ? !b.isStripe : b.isStripe);
+
+                if (hasAssignedRemaining || !currentType) {
+                    gameOver = true;
+                    message = `Player ${turn} potted 8-ball too early! Player ${3 - turn} Wins!`;
+                } else {
+                    gameOver = true;
+                    message = `Player ${turn} potted 8-ball legally! Player ${turn} Wins!`;
+                }
+                updateUI();
+                shotPottedBalls = [];
+                return;
+            }
+
+            // Handle normal object balls
+            if (regularBalls.length > 0) {
+                if (!p1Type && !p2Type) {
+                    // First ball assigned
+                    let firstPotted = regularBalls[0];
+                    if (firstPotted.isStripe) {
+                        p1Type = turn === 1 ? 'stripe' : 'solid';
+                        p2Type = turn === 1 ? 'solid' : 'stripe';
+                    } else {
+                        p1Type = turn === 1 ? 'solid' : 'stripe';
+                        p2Type = turn === 1 ? 'stripe' : 'solid';
+                    }
+                }
+
+                let currentType = turn === 1 ? p1Type : p2Type;
+                let scoredOwn = regularBalls.some(b => currentType === 'solid' ? !b.isStripe : b.isStripe);
+
+                if (scoredOwn) {
+                    message = `Player ${turn} scored! Take another shot.`;
+                    // Player keeps their turn
+                } else {
+                    message = `Wrong ball type or no ball scored. Player ${3 - turn}'s turn.`;
+                    turn = 3 - turn;
+                }
+            } else {
+                // Nothing scored
+                message = `Player ${3 - turn}'s Turn`;
+                turn = 3 - turn;
+            }
+
+            updateUI();
+            shotPottedBalls = [];
+        }
+
+        function updateUI() {
+            document.getElementById('statusBar').innerText = message;
+            document.getElementById('player1Card').classList.toggle('active', turn === 1 && !gameOver);
+            document.getElementById('player2Card').classList.toggle('active', turn === 2 && !gameOver);
+
+            document.getElementById('p1Type').innerText = p1Type ? p1Type.toUpperCase() : 'Unassigned';
+            document.getElementById('p2Type').innerText = p2Type ? p2Type.toUpperCase() : 'Unassigned';
+        }
+
+        function areBallsStopped() {
+            return balls.every(b => Math.abs(b.vx) < 0.1 && Math.abs(b.vy) < 0.1);
+        }
+
+        // --- Event Handlers (Mouse & Touch Support) ---
+        function getEventPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            }
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function handleStart(e) {
+            if (!areBallsStopped() || gameOver) return;
+            const pos = getEventPos(e);
+
+            if (ballInHand) {
+                cueBall.x = pos.x;
+                cueBall.y = pos.y;
+                cueBall.vx = 0;
+                cueBall.vy = 0;
+                ballInHand = false;
+                message = `Player ${turn}'s Turn`;
+                updateUI();
+                return;
+            }
+
+            let dist = Math.hypot(pos.x - cueBall.x, pos.y - cueBall.y);
+            if (dist < cueBall.radius + 20) {
+                isAiming = true;
+                aimStart = { x: cueBall.x, y: cueBall.y };
+                aimCurrent = pos;
+            }
+        }
+
+        function handleMove(e) {
+            if (!isAiming) return;
+            aimCurrent = getEventPos(e);
+        }
+
+        function handleEnd(e) {
+            if (!isAiming) return;
+            isAiming = false;
+
+            let dx = cueBall.x - aimCurrent.x;
+            let dy = cueBall.y - aimCurrent.y;
+            let power = Math.hypot(dx, dy) * 0.18;
+
+            let maxPower = 18;
+            if (power > maxPower) power = maxPower;
+            if (power < 0.5) return; // Too small drag, ignore
+
+            let angle = Math.atan2(dy, dx);
+            cueBall.vx = Math.cos(angle) * power;
+            cueBall.vy = Math.sin(angle) * power;
+
+            shotTaken = true;
+            shotPottedBalls = [];
+            message = `Shot taken...`;
+            updateUI();
+        }
+
+        // Mouse listeners
+        canvas.addEventListener('mousedown', handleStart);
+        canvas.addEventListener('mousemove', handleMove);
+        canvas.addEventListener('mouseup', handleEnd);
+
+        // Touch listeners for iPhone / Mobile
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e); }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handleMove(e); }, { passive: false });
+        canvas.addEventListener('touchend', (e) => { e.preventDefault(); handleEnd(e); }, { passive: false });
+
+        function drawTable() {
+            ctx.fillStyle = '#065f46';
+            ctx.fillRect(table.x, table.y, table.width, table.height);
+
+            ctx.strokeStyle = '#044732';
+            ctx.lineWidth = 12;
+            ctx.strokeRect(table.x + 6, table.y + 6, table.width - 12, table.height - 12);
+
+            pockets.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#0f172a';
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#334155';
+                ctx.stroke();
+            });
+        }
+
+        function drawAimCue() {
+            if (!isAiming) return;
+
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+
+            let dx = aimCurrent.x - cueBall.x;
+            let dy = aimCurrent.y - cueBall.y;
+            let angle = Math.atan2(dy, dx);
+
+            ctx.beginPath();
+            ctx.moveTo(cueBall.x, cueBall.y);
+            ctx.lineTo(cueBall.x - Math.cos(angle) * 150, cueBall.y - Math.sin(angle) * 150);
+            ctx.stroke();
+
+            let cueStickX = cueBall.x + Math.cos(angle) * 30;
+            let cueStickY = cueBall.y + Math.sin(angle) * 30;
+            let cueTipX = cueStickX + Math.cos(angle) * 180;
+            let cueTipY = cueStickY + Math.sin(angle) * 180;
+
+            ctx.setLineDash([]);
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 8;
+            ctx.beginPath();
+            ctx.moveTo(cueStickX, cueStickY);
+            ctx.lineTo(cueTipX, cueTipY);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawTable();
+
+            balls.forEach(ball => {
+                ball.update();
+                ball.draw();
+            });
+
+            checkCollisions();
+            checkPockets();
+            drawAimCue();
+
+            // Check if shot was taken and all balls stopped moving -> Evaluate score & turn
+            if (shotTaken && areBallsStopped()) {
+                shotTaken = false;
+                if (!gameOver) {
+                    evaluateShotResults();
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resetGame() {
+            initRack();
+        }
+
+        initRack();
+        gameLoop();
+    </script>
+</body>
+</html>
